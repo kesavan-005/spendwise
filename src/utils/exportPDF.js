@@ -2,88 +2,137 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import html2canvas from "html2canvas";
 
+function formatINR(n) {
+  return `Rs. ${Number(n || 0).toFixed(0)}`;
+}
+
 export async function exportSpendWisePDF({
   username = "User",
   totals,
   transactions,
-  chartElementId = "report-pdf-charts",
+  highlighted = [],
+  dailyRef,
+  categoryRef,
+  balanceRef,
+  includeGraphs = true,
 }) {
   const doc = new jsPDF("p", "mm", "a4");
 
   doc.setFont("helvetica", "normal");
 
-  // Title
+  // ---------------- TITLE ----------------
   doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
   doc.text("SpendWise Report", 14, 18);
 
   doc.setFontSize(11);
-  doc.setTextColor(90);
-  doc.text(`Generated for: ${username}`, 14, 25);
-  doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 31);
-  doc.setTextColor(0);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Generated for: ${username}`, 14, 26);
+  doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 32);
 
-  // Summary
-  doc.setFontSize(14);
-  doc.text("Summary", 14, 42);
+  // ---------------- SUMMARY ----------------
+  const startY = 42;
+  const cardW = 60;
+  const cardH = 18;
 
-  doc.setFontSize(12);
-  doc.text(`Total Credit: Rs. ${totals.credit.toFixed(0)}`, 14, 50);
-  doc.text(`Total Debit: Rs. ${totals.debit.toFixed(0)}`, 14, 57);
-  doc.text(`Balance: Rs. ${totals.balance.toFixed(0)}`, 14, 64);
+  function card(x, title, value, color) {
+    doc.setFillColor(...color);
+    doc.roundedRect(x, startY, cardW, cardH, 4, 4, "F");
 
-  // Charts section
-  let currentY = 72;
-  const chartEl = document.getElementById(chartElementId);
+    doc.setTextColor(255);
+    doc.setFont("helvetica", "bold");
+    doc.text(title, x + 4, startY + 7);
+    doc.text(value, x + 4, startY + 15);
 
-  if (chartEl) {
-    doc.setFontSize(14);
-    doc.text("Graphs", 14, currentY);
-    currentY += 6;
-
-    const canvas = await html2canvas(chartEl, {
-      backgroundColor: "#ffffff",   // ✅ clean white
-      scale: 2,
-      useCORS: true,
-    });
-
-    const imgData = canvas.toDataURL("image/png");
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const imgWidth = pageWidth - 28;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-    doc.addImage(imgData, "PNG", 14, currentY, imgWidth, imgHeight);
-    currentY += imgHeight + 10;
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "normal");
   }
 
-  // Transactions
-  doc.setFontSize(14);
-  doc.text("Transactions", 14, currentY);
+  card(14, "Total Credit", formatINR(totals.credit), [16, 185, 129]);
+  card(80, "Total Debit", formatINR(totals.debit), [244, 63, 94]);
+  card(146, "Balance", formatINR(totals.balance), [59, 130, 246]);
 
-  const rows = transactions.map((t) => [
-    t.date,
-    (t.type || "").toUpperCase(),
-    t.category,
-    t.description,
-    `Rs. ${t.amount}`,
-  ]);
+  let y = startY + cardH + 14;
+
+  // ---------------- GRAPHS ----------------
+  if (includeGraphs && dailyRef && categoryRef && balanceRef) {
+    const grab = async (r) =>
+      r?.current
+        ? (await html2canvas(r.current, { scale: 2 })).toDataURL("image/png")
+        : null;
+
+    const d = await grab(dailyRef);
+    const c = await grab(categoryRef);
+    const b = await grab(balanceRef);
+
+    const W = 58;
+    const H = 55;
+    const G = 6;
+
+    if (d) doc.addImage(d, "PNG", 14, y, W, H);
+    if (c) doc.addImage(c, "PNG", 14 + W + G, y, W, H);
+    if (b) doc.addImage(b, "PNG", 14 + (W + G) * 2, y, W, H);
+
+    y += H + 12;
+  }
+
+  // ---------------- TRANSACTIONS ----------------
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Transactions", 14, y);
+  y += 4;
 
   autoTable(doc, {
-    startY: currentY + 5,
+    startY: y,
+
     head: [["Date", "Type", "Category", "Description", "Amount"]],
-    body: rows,
+
+    body: transactions.map((t) => [
+      t.date,
+      (t.type || "").toUpperCase(),
+      t.category || "Other",
+      t.description || "",
+      formatINR(t.amount),
+    ]),
+
     styles: {
       font: "helvetica",
-      fontSize: 10,
+      fontSize: 9,
+      cellPadding: 3,
     },
+
     headStyles: {
+      fillColor: [59, 130, 246],
+      textColor: 255,
       fontStyle: "bold",
-      fillColor: [16, 185, 129],
-      textColor: 0,
     },
-    alternateRowStyles: { fillColor: [245, 245, 245] },
-    margin: { left: 14, right: 14 },
+
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+
+    columnStyles: {
+      0: { cellWidth: 22 },
+      1: { cellWidth: 20 },
+      2: { cellWidth: 34 },
+      3: { cellWidth: 74 },
+      4: { cellWidth: 26 },
+    },
+
+    didParseCell(data) {
+      if (data.section === "body") {
+        const rowTxn = transactions[data.row.index];
+
+        if (highlighted.includes(rowTxn.id)) {
+          data.cell.styles.fillColor = [255, 249, 196];
+          data.cell.styles.fontStyle = "bold";
+        }
+      }
+    },
   });
+
+  doc.setFontSize(9);
+  doc.setTextColor(120);
+  doc.text("Generated by SpendWise 💓", 105, 290, { align: "center" });
+  doc.setTextColor(0);
 
   doc.save(`SpendWise_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
 }

@@ -27,6 +27,7 @@ export default function AddTransaction({ username }) {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [isAutoDesc, setIsAutoDesc] = useState(false);
+  const [highlighted, setHighlighted] = useState(false);
 
   // ----------------------
   // Categories
@@ -53,7 +54,7 @@ export default function AddTransaction({ username }) {
   const categorySuggestions = useMemo(
     () => ({
       "Income (Credited)": "AMOUNT CREDITED TO ACCOUNT",
-      "Rental Home Expenses": "RENT / HOME NEEDS",
+      "Rental Home Expenses": "RENTAL HOME NEEDS",
       "Family Home Expenses": "FAMILY EXPENSES",
       Subscriptions: "SUBSCRIPTION PAYMENT",
       Breakfast: "BREAKFAST",
@@ -141,14 +142,17 @@ export default function AddTransaction({ username }) {
     if (!description.trim()) return showToast("Enter description", "error");
 
     try {
-      await addDoc(txnsRef, {
-        date,
-        type,
-        amount: Number(amount),
-        category: category || "Other",
-        description: description.trim().toUpperCase(),
-        createdAt: serverTimestamp(),
-      });
+    await addDoc(txnsRef, {
+    date,
+    type,
+    amount: Number(amount),
+    category: category || "Other",
+    description: description.trim().toUpperCase(),
+    highlighted,
+    createdAt: serverTimestamp(),
+  });
+
+
 
       showToast("Transaction saved", "success");
 
@@ -158,7 +162,7 @@ export default function AddTransaction({ username }) {
       setCategory("Other");
       setDescription("");
       setIsAutoDesc(false);
-
+      setHighlighted(false);
       loadTotals();
     } catch (err) {
       console.error(err);
@@ -293,6 +297,21 @@ export default function AddTransaction({ username }) {
                 className={inputClass}
               />
             </div>
+
+            {/* Highlight */}
+            <div className="flex items-center gap-3 mt-2">
+              <input
+                type="checkbox"
+                checked={highlighted}
+                onChange={(e) => setHighlighted(e.target.checked)}
+                className="w-5 h-5 accent-emerald-500"
+              />
+
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                Highlight this transaction (important / exam / permanent)
+              </span>
+            </div>
+
 
             <button className="w-full p-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 font-extrabold text-black shadow-[0_0_25px_rgba(16,185,129,0.35)]">
               Save Transaction

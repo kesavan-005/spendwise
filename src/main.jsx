@@ -5,14 +5,7 @@ import App from "./App.jsx";
 
 import { registerSW } from "virtual:pwa-register";
 
-const updateSW = registerSW({
-  onNeedRefresh() {
-    updateSW(true); // auto update
-  },
-  onOfflineReady() {
-    // no message needed
-  },
-});
+registerSW({ immediate: true });
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
