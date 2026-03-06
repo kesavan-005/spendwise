@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
-import { HashRouter , Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
+import Login          from "./pages/Login";
+import Dashboard      from "./pages/Dashboard";
 import AddTransaction from "./pages/AddTransaction";
-import Reports from "./pages/Reports";
-import Settings from "./pages/Settings";
-
-import Navbar from "./components/Navbar";
+import Reports        from "./pages/Reports";
+import Settings       from "./pages/Settings";
+import Navbar         from "./components/Navbar";
+import QuickAdd       from "./components/QuickAdd";
 
 export default function App() {
   const [username, setUsername] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const saved = localStorage.getItem("spendwise_username");
@@ -22,7 +23,11 @@ export default function App() {
     setUsername(null);
   }
 
-  // If no username -> Login page only
+  // called by QuickAdd after a successful save — bumps key so Dashboard/Reports reload
+  function handleQuickSaved() {
+    setRefreshKey((k) => k + 1);
+  }
+
   if (!username) return <Login onLogin={setUsername} />;
 
   return (
@@ -30,14 +35,15 @@ export default function App() {
       <Navbar onLogout={logout} />
 
       <Routes>
-        <Route path="/" element={<Dashboard username={username} />} />
-        <Route path="/add" element={<AddTransaction username={username} />} />
-        <Route path="/reports" element={<Reports username={username} />} />
-        <Route path="/settings" element={<Settings username={username} />} />
-
-        {/* fallback */}
-        <Route path="*" element={<Navigate to="/" />} />
+        <Route path="/"        element={<Dashboard      username={username} refreshKey={refreshKey} />} />
+        <Route path="/add"     element={<AddTransaction username={username} />} />
+        <Route path="/reports" element={<Reports        username={username} />} />
+        <Route path="/settings"element={<Settings       username={username} />} />
+        <Route path="*"        element={<Navigate to="/" />} />
       </Routes>
+
+      {/* Floating quick-add button — visible on every page */}
+      <QuickAdd username={username} onSaved={handleQuickSaved} />
     </HashRouter>
   );
 }

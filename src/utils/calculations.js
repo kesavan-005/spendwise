@@ -1,38 +1,59 @@
-export function calcTotals(transactions = []) {
-  let debit = 0;
-  let credit = 0;
-  let cash = 0;
+// ─── calcTotals ────────────────────────────────────────────────────────────
+// Cash direction stored on each transaction as:
+//   type: "cash"  +  cashDirection: "in"   → cash received
+//   type: "cash"  +  cashDirection: "out"  → cash spent
+//
+// Legacy records (type:"cash", no cashDirection) default to "out"
+// so existing data is unaffected.
+// ──────────────────────────────────────────────────────────────────────────
+export function calcTotals(txns = []) {
+  let credit  = 0;
+  let debit   = 0;
+  let cashIn  = 0;
+  let cashOut = 0;
 
-  for (const t of transactions) {
-    if (t.type === "debit") debit += t.amount;
-    if (t.type === "credit") credit += t.amount;
-    if (t.type === "cash") cash += t.amount;
+  for (const t of txns) {
+    const amt = Number(t.amount || 0);
+    if (t.type === "credit") {
+      credit += amt;
+    } else if (t.type === "debit") {
+      debit += amt;
+    } else if (t.type === "cash") {
+      if (t.cashDirection === "in") cashIn  += amt;
+      else                          cashOut += amt; // default legacy → out
+    }
   }
 
-  const balance = credit - debit;
+  const netCash = cashIn - cashOut;
+  const balance = credit + cashIn - debit - cashOut;
 
   return {
-    debit,
     credit,
-    cash,
+    debit,
+    cashIn,
+    cashOut,
+    netCash,
+    cash: cashOut, // legacy compat — older code reads totals.cash
     balance,
   };
 }
 
-export function groupByCategory(transactions = []) {
+// ─── groupByDate ───────────────────────────────────────────────────────────
+export function groupByDate(txns = []) {
   const map = {};
-  for (const t of transactions) {
-    const cat = t.category || "Other";
-    map[cat] = (map[cat] || 0) + t.amount;
+  for (const t of txns) {
+    const d = t.date || "unknown";
+    map[d] = (map[d] || 0) + Number(t.amount || 0);
   }
   return map;
 }
 
-export function groupByDate(transactions = []) {
+// ─── groupByCategory ──────────────────────────────────────────────────────
+export function groupByCategory(txns = []) {
   const map = {};
-  for (const t of transactions) {
-    const d = t.date;
-    map[d] = (map[d] || 0) + t.amount;
+  for (const t of txns) {
+    const cat = t.category || "Other";
+    map[cat] = (map[cat] || 0) + Number(t.amount || 0);
   }
   return map;
 }
