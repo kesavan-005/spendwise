@@ -28,18 +28,34 @@ export default function Login({ onLogin }) {
 
   // ── PIN input handlers ─────────────────────────────────────────────────
   function onPinChange(val, idx, arr, setArr, refs) {
+    // handle paste of full 4-digit PIN
+    if (val.length > 1) {
+      const digits = val.replace(/\D/g, "").slice(0, 4).split("");
+      if (!digits.length) return;
+      const next = ["", "", "", ""];
+      digits.forEach((d, i) => { next[i] = d; });
+      setArr(next);
+      refs[Math.min(digits.length, 3)].current?.focus();
+      return;
+    }
     if (!/^\d?$/.test(val)) return;
     const next = [...arr];
     next[idx] = val;
     setArr(next);
+    // auto-advance immediately on digit entry
+    if (val && idx < 3) refs[idx + 1].current?.focus();
   }
 
   function onPinKey(e, idx, arr, setArr, refs) {
-    if (e.key === "Backspace" && !arr[idx] && idx > 0) {
-      refs[idx - 1].current?.focus();
-    } else if (/^\d$/.test(e.key) && idx < 3 && !arr[idx]) {
-      // Move to next input immediately when a digit is pressed
-      setTimeout(() => refs[idx + 1].current?.focus(), 10);
+    if (e.key === "Backspace") {
+      if (arr[idx]) {
+        // clear current box only
+        const next = [...arr]; next[idx] = ""; setArr(next);
+      } else if (idx > 0) {
+        // move back and clear previous box
+        const next = [...arr]; next[idx - 1] = ""; setArr(next);
+        refs[idx - 1].current?.focus();
+      }
     }
   }
 
@@ -126,7 +142,7 @@ export default function Login({ onLogin }) {
               ref={refs[i]}
               type="password"
               inputMode="numeric"
-              maxLength={1}
+              maxLength={4}
               value={digit}
               onChange={(e) => onPinChange(e.target.value, i, arr, setArr, refs)}
               onKeyDown={(e) => onPinKey(e, i, arr, setArr, refs)}
@@ -188,6 +204,8 @@ export default function Login({ onLogin }) {
                 <input
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && pinRefs[0].current?.focus()}
+                  onBlur={() => { if (username.trim()) setTimeout(() => pinRefs[0].current?.focus(), 50); }}
                   placeholder="Enter your username"
                   autoComplete="username"
                   spellCheck={false}
